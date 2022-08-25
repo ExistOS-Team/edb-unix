@@ -1,12 +1,7 @@
 #include <cstring>
-#include <errno.h>
 #include <iostream>
-#include <stdint.h>
-#include <stdio.h>
-#include <time.h>
 #include <vector>
 #include <unistd.h>
-
 #include "EDBInterface.h"
 
 using namespace std;
@@ -16,19 +11,14 @@ vector<flashImg> imglist;
 EDBInterface edb;
 
 void showUsage() {
-    cout << "Note: Serial mode not yet implemented." << endl;
-    cout << "\tUSB MSC mode is forced on." << endl;
+    cout << "Note: Serial mode is deprecated by the King and will NOT be implemented." << endl;
     cout << "Usage:" << endl;
-    cout << "\t-f <bin file> <page> [b]" << endl;
-    cout
-        << "\t-p <serial port> ,if not provided an automatic select will be used."
-        << endl;
-    cout << "\t-s use USB MSC to communicate (High Speed)." << endl;
+    cout << "\t-f <bin file> <page> [b] (Specify 'b' to flash as boot image.)" << endl;
     cout << "\t-r Reboot if all operations done." << endl;
+    cout << "\t-m Enter MSC mode. (Is this working at all?)" << endl;
 }
 
 int main(int argc, char *argv[]) {
-    bool hs = true;
     bool reboot = false;
     bool mscmode = false;
 
@@ -64,36 +54,24 @@ int main(int argc, char *argv[]) {
                     item.bootImg = true;
                 }
             }
-            printf("Flash to page:%d\n", item.toPage);
+            printf("Flash to page: %d\n", item.toPage);
             imglist.push_back(item);
-        }
-
-        if (strcmp(argv[i], "-s") == 0) {
-            hs = true;
-            printf("Use USB MSC.\n");
         }
 
         if (strcmp(argv[i], "-r") == 0) {
             reboot = true;
         }
+
         if (strcmp(argv[i], "-m") == 0) {
             mscmode = true;
         }
     }
 
-    if (edb.open(hs)) {
-
+    if (edb.open()) {
         edb.close();
         return -1;
-        /*
-        hs = false;
-        if (edb.open(false)) {
-            return -1;
-        }
-         */
     }
 
-    edb.reset(EDB_MODE_TEXT);
     if (edb.ping() == false) {
         cout << "Device not responding." << endl;
         edb.close();
@@ -108,7 +86,10 @@ int main(int argc, char *argv[]) {
     edb.vm_suspend();
     for (flashImg &item : imglist) {
         edb.flash(item);
-        cout << fclose(item.f) << endl;
+        int ret = fclose(item.f);
+        if (ret) {
+            printf("fclose(item.f) failed with code %d\n", ret);
+        }
     }
     // edb.vm_reset();
     // edb.vm_resume();

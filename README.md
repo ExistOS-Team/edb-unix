@@ -1,6 +1,6 @@
 # ExistOS Dump Bridge for Linux
 
-Forked from [yuuki410/ExistOS-Dump-Brige](https://github.com/yuuki410/ExistOS-Dump-Brige)
+Forked from [yuuki410/ExistOS-Dump-Brige](https://github.com/yuuki410/ExistOS-Dump-Brige).
 
 A Linux port of [edb](https://github.com/ExistOS-Team/edb).
 
@@ -9,7 +9,7 @@ Flashing ExistOS firmware to HP39gii.
 ## TODO
 
 - [x] flash via USB MSC
-- [ ] flash via COM serial port
+- ~~[ ] flash via COM serial port~~
 
 ## Compiling
 
