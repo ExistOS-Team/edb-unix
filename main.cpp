@@ -14,8 +14,8 @@ void showUsage() {
     cout << "Note: Serial mode is deprecated by the King and will NOT be implemented." << endl;
     cout << "Usage:" << endl;
     cout << "\t-f <bin file> <page> [b] (Specify 'b' to flash as boot image.)" << endl;
-    cout << "\t-r Reboot if all operations done." << endl;
-    cout << "\t-m Enter MSC mode. (Is this working at all?)" << endl;
+    cout << "\t-r Reboot if all operations are done." << endl;
+    cout << "\t-m Enter Mass Storage mode. (Is this working at all?)" << endl;
 }
 
 int main(int argc, char *argv[]) {
