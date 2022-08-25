@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <vector>
+#include <unistd.h>
 
 #include "EDBInterface.h"
 
@@ -15,6 +16,8 @@ vector<flashImg> imglist;
 EDBInterface edb;
 
 void showUsage() {
+    cout << "Note: Serial mode not yet implemented." << endl;
+    cout << "\tUSB MSC mode is forced on." << endl;
     cout << "Usage:" << endl;
     cout << "\t-f <bin file> <page> [b]" << endl;
     cout
@@ -25,12 +28,17 @@ void showUsage() {
 }
 
 int main(int argc, char *argv[]) {
-    bool hs = false;
+    bool hs = true;
     bool reboot = false;
     bool mscmode = false;
 
     if (argc < 2) {
         showUsage();
+        return -1;
+    }
+
+    if (geteuid() != 0) {
+        cout << "Please run with root privileges!" << endl;
         return -1;
     }
 
@@ -75,16 +83,20 @@ int main(int argc, char *argv[]) {
 
     if (edb.open(hs)) {
 
-        // return -1;
+        edb.close();
+        return -1;
+        /*
         hs = false;
         if (edb.open(false)) {
             return -1;
         }
+         */
     }
 
     edb.reset(EDB_MODE_TEXT);
     if (edb.ping() == false) {
-        cout << "Device No Responses." << endl;
+        cout << "Device not responding." << endl;
+        edb.close();
         return 10;
     }
 

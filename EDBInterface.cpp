@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mount.h>
+#include <malloc.h>
 using namespace std;
 
 long long getTime() {
@@ -25,12 +28,13 @@ unsigned char blockChksum(char *block, unsigned int blockSize) {
 }
 
 void EDBInterface::reset(bool mode) {
-    DWORD wrcnt;
-    bool ret;
+    //DWORD wrcnt;
+    //bool ret;
     if (USBHighSpeed) {
         // Sleep(100);
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // com.SetRTS(mode);
         // Sleep(20);
@@ -41,16 +45,16 @@ void EDBInterface::reset(bool mode) {
 bool EDBInterface::waitStr(char *str) {
     int len = strlen(str);
     int retry = 2;
-    DWORD cnt;
-    char buf[128];
-    memset(buf, 0, 128);
+    //DWORD cnt;
+    //char buf[128];
+    //memset(buf, 0, 128);
     int ret;
     if (USBHighSpeed) {
         while (retry > 0) {
             cout << "Waiting Sync...\r";
-            memset(wrBuf, 0, sizeof(wrBuf));
-            SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
-            ret = ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+            memset(wrBuf, 0, wrBufSize);
+            lseek(hCMDf, 0, SEEK_SET);
+            ret = read(hCMDf, wrBuf, wrBufSize);  // ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
             if (ret) {
                 if (strcmp(str, wrBuf) == 0) {
                     return true;
@@ -67,6 +71,7 @@ bool EDBInterface::waitStr(char *str) {
         }
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // while (retry > 0) {
         //     cout << "Waiting Sync...\r";
@@ -93,15 +98,16 @@ void EDBInterface::wrStr(const char *str) {
     if (!str) {
         return;
     }
-    DWORD cnt;
+    //DWORD cnt;
     int len = strlen(str);
     if (USBHighSpeed) {
-        memset(wrBuf, 0, sizeof(wrBuf));
+        memset(wrBuf, 0, wrBufSize);
         strcpy(wrBuf, str);
-        SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
-        WriteFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+        lseek(hCMDf, 0, SEEK_SET);
+        write(hCMDf, wrBuf, wrBufSize);  // WriteFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // com.WriteStr(str);
     }
@@ -109,11 +115,11 @@ void EDBInterface::wrStr(const char *str) {
 
 bool EDBInterface::wrDat(char *dat, size_t len) {
     int ret = 0;
-    DWORD cnt;
+    //DWORD cnt;
     if (USBHighSpeed) {
-        SetFilePointer(hDATf, 0, NULL, FILE_BEGIN);
+        lseek(hDATf, 0, SEEK_SET);
 
-        ret = WriteFile(hDATf, dat, len, &cnt, NULL);
+        ret = write(hDATf, dat, len);  // WriteFile(hDATf, dat, len, &cnt, NULL);
 
         if (ret) {
             return true;
@@ -121,17 +127,18 @@ bool EDBInterface::wrDat(char *dat, size_t len) {
         return false;
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // return com.Write(dat, len);
     }
 }
 
 bool EDBInterface::rdDat(char *dat, size_t len, size_t *rbcnt) {
-    DWORD cnt;
+    //DWORD cnt;
     if (USBHighSpeed) {
-        memset(wrBuf, 0, sizeof(wrBuf));
-        SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
-        int ret = ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+        memset(wrBuf, 0, wrBufSize);
+        lseek(hCMDf, 0, SEEK_SET);
+        int ret = read(hCMDf, wrBuf, wrBufSize);  // ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
         memcpy(dat, wrBuf, len);
         *rbcnt = len;
         if (ret) {
@@ -140,6 +147,7 @@ bool EDBInterface::rdDat(char *dat, size_t len, size_t *rbcnt) {
         return false;
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // return com.Read(dat, len, (DWORD *)rbcnt);
     }
@@ -163,12 +171,12 @@ int EDBInterface::flash(flashImg item) {
     size_t rbcnt;
     this->reset(EDB_MODE_TEXT);
     if (this->ping() == false) {
-        cout << "Device No Responses." << endl;
+        cout << "Device not responding." << endl;
         return false;
     }
     this->wrStr("RESETDBUF\n");
     if (!this->waitStr((char *)"READY\n")) {
-        cout << "Device No Responses." << endl;
+        cout << "Device not responding." << endl;
         return false;
     }
     cout << "Writing: " << item.filename << "..." << endl;
@@ -177,7 +185,7 @@ int EDBInterface::flash(flashImg item) {
     uint8_t chksum;
     uint32_t rcshkdum;
     long long st;
-    fseek(item.f, 0, SEEK_SET);
+    rewind(item.f);
 
     uint32_t page_cnt = item.toPage;
     uint32_t block_cnt = page_cnt / 64;
@@ -187,14 +195,14 @@ int EDBInterface::flash(flashImg item) {
 
         st = getTime();
 
-        memset(sendBuf, 0xFF, BIN_BLOCK_SIZE);
+        memset(sendBuf, 0xFF, BIN_BLOB_SIZE);
         memset(cmdbuf, 0, 64);
 
-        cnt = fread(sendBuf, 1, BIN_BLOCK_SIZE, item.f);
-        chksum = blockChksum(sendBuf, BIN_BLOCK_SIZE);
+        cnt = fread(sendBuf, 1, BIN_BLOB_SIZE, item.f);
+        chksum = blockChksum(sendBuf, BIN_BLOB_SIZE);
 
         this->reset(EDB_MODE_BIN);
-        this->wrDat(sendBuf, BIN_BLOCK_SIZE);
+        this->wrDat(sendBuf, BIN_BLOB_SIZE);
         this->reset(EDB_MODE_TEXT);
 
         this->wrStr("BUFCHK\n");
@@ -228,7 +236,7 @@ int EDBInterface::flash(flashImg item) {
         }
 
         if (page_cnt % 200 == 0) {
-            long long speed = BIN_BLOCK_SIZE / (getTime() - st);
+            long long speed = BIN_BLOB_SIZE / (getTime() - st);
             cout << "Upload: " << ftell(item.f) << "/" << fsize;
             cout << " Page:" << page_cnt << " Block:" << block_cnt << " ";
             printf(" chksum:%02x==%02x, %lld KB/s", chksum, rcshkdum, speed);
@@ -236,7 +244,7 @@ int EDBInterface::flash(flashImg item) {
             fflush(stdout);
         }
 
-        page_cnt += BIN_BLOCK_SIZE / 2048;
+        page_cnt += BIN_BLOB_SIZE / 2048;
         last_block = block_cnt;
     } while (cnt > 0);
 
@@ -276,20 +284,20 @@ void EDBInterface::mscmode() {
 
 bool EDBInterface::ping() {
     char buf[16];
-    DWORD cnt;
+    //DWORD cnt;
     int retry = 5;
     int ret;
 
     if (USBHighSpeed) {
-        while (retry > 0) {
-            memset(wrBuf, 0, sizeof(wrBuf));
+        while (retry) {
+            memset(wrBuf, 0, wrBufSize);
             strcpy(wrBuf, "PING\n");
-            SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
-            ret = WriteFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
-            if (ret) {
-                SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
-                ret = ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
-                if (ret) {
+            lseek(hCMDf, 0, SEEK_SET);  // SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
+            ret = write(hCMDf, wrBuf, wrBufSize);  // ret = WriteFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+            if (ret > 0) {
+                lseek(hCMDf, 0, SEEK_SET);  // SetFilePointer(hCMDf, 0, NULL, FILE_BEGIN);
+                ret = read(hCMDf, wrBuf, wrBufSize);  // ret = ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+                if (ret > 0) {
                     if (strcmp(wrBuf, "PONG\n") == 0) {
                         return true;
                     }
@@ -304,6 +312,7 @@ bool EDBInterface::ping() {
         }
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // while (retry > 0) {
         //     com.WriteStr("PING\n");
@@ -327,66 +336,117 @@ bool EDBInterface::ping() {
 
 void EDBInterface::close() {
     if (USBHighSpeed) {
-        CloseHandle(hCMDf);
-        CloseHandle(hDATf);
+        ::close(hCMDf);  // CloseHandle(hCMDf);
+        ::close(hDATf);  // CloseHandle(hDATf);
+
+        char *c_mnt_path = "/mnt/edbMount";
+
+        int returnVal = umount(c_mnt_path);
+        if (returnVal) {
+            printf("umount() failed with code %d\n", returnVal);
+        }
+
+        returnVal = rmdir(c_mnt_path);
+        if (returnVal) {
+            printf("rmdir() failed with code %d\n", returnVal);
+        }
+
     } else {
     }
-}
 
-LPWSTR ConvertCharToLPWSTR(const char *szString)
-
-{
-
-    int dwLen = strlen(szString) + 1;
-
-    int nwLen = MultiByteToWideChar(CP_ACP, 0, szString, dwLen, NULL, 0); //算出合适的长度
-
-    LPWSTR lpszPath = new WCHAR[dwLen];
-
-    MultiByteToWideChar(CP_ACP, 0, szString, dwLen, lpszPath, nwLen);
-
-    return lpszPath;
+    free(wrBuf);
+    free(sendBuf);
+    wrBuf = nullptr;
+    sendBuf = nullptr;
 }
 
 int EDBInterface::open(bool mode) {
-    int retry = 5;
+    free(wrBuf);
+    free(sendBuf);
+    wrBuf = (char*) memalign(512, wrBufSize);
+    sendBuf = (char*) memalign(512, BIN_BLOB_SIZE);
+
     USBHighSpeed = mode;
     if (USBHighSpeed) {
-        char d = 0;
-        char *c_cmd_path = "/mnt/CMD_PORT";
-        char *c_dat_path = "/mnt/DAT_PORT";
-        while (d == 0) {
-            cout << "Waiting USB CDC Connect..." << endl;
-            FILE *mounts;
-            char c_char;
-            char *c_root_path;
-            mounts = fopen("/proc/mounts", "r");
-            fscanf(mounts, "/dev/sd%c %s/EOSRECDISK", &d, c_root_path);
-            sleep(2);
-            retry--;
-            if (retry == 0) {
+        FILE *lsblkFile;
+        char *c_mnt_path = "/mnt/edbMount";
+        char *c_cmd_path = "/mnt/edbMount/cmd_port";
+        char *c_dat_path = "/mnt/edbMount/dat_port";
+
+        char line[128] = "\0";
+        char *devicePath = nullptr;
+
+        cout << "Waiting for USB CDC connection: " << flush;
+
+        // ----------------GET 39GII BLOCK FILE PATH----------------
+
+        for (int retry = 0; retry < 5; retry++) {
+
+            lsblkFile = popen("lsblk -d -P -p -o HOTPLUG,VENDOR,LABEL,KNAME", "r");
+            if (lsblkFile) {
+
+                while (fgets(line, sizeof(line), lsblkFile)) {  // iterate through every line
+                    // check if this line is what we are looking for
+                    if (strstr(line, "HOTPLUG=\"1\"") != nullptr &&  // Is a USB device?
+                        strstr(line, "ExistOS")       != nullptr /*&&*/  // Vendor should contain "ExistOS"
+                        /*strstr(line, "EOSRECDISK")    != nullptr*/) {  // Label should contain "EOSRECDISK"
+
+                        char *position = strstr(line, "KNAME=\"");  // locate where 'KNAME="' starts
+                        if (position) {
+                            position += 7; // jump over 'KNAME="'
+                            char *endPosition = strchr(position, '"');  // locate the end of KNAME key-value pair
+
+                            if (endPosition != nullptr && position != endPosition) {  // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
+                                *endPosition = '\0';  // Success!
+                                devicePath = position;
+                                break;  // retreat!
+                            }
+                        }
+                    }
+                    line[0] = '\0';  // in case fgets goes nuts (Is this really necessary?)
+                }
+
+                fclose(lsblkFile);
+            }
+
+            if (devicePath) break;  // devicePath not being null indicates a success
+            if (retry == 4) {
+                cout << " timed out." << endl;
                 return -1;
             }
+            cout << "." << flush;  // every dot indicates a failed attempt
+            sleep(2);
         }
+        cout << " connected." << endl;
 
-        hCMDf = CreateFile(ConvertCharToLPWSTR(c_cmd_path), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
-                           NULL, OPEN_EXISTING,
-                           FILE_ATTRIBUTE_NORMAL |
-                               FILE_FLAG_NO_BUFFERING |
-                               FILE_FLAG_WRITE_THROUGH,
-                           NULL);
-        hDATf = CreateFile(ConvertCharToLPWSTR(c_dat_path), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
-                           NULL, OPEN_EXISTING,
-                           FILE_ATTRIBUTE_NORMAL |
-                               FILE_FLAG_NO_BUFFERING |
-                               FILE_FLAG_WRITE_THROUGH,
-                           NULL);
-        if (hCMDf == INVALID_HANDLE_VALUE || hDATf == INVALID_HANDLE_VALUE) {
-            cout << "Failed to open Device." << endl;
+        // ----------------MOUNT 39GII DISK----------------
+
+        struct stat st = {0};
+        
+        if (stat(c_mnt_path, &st) == -1) {
+            mkdir(c_mnt_path, 0700);
+        } else if ((st.st_mode & S_IFMT) != S_IFDIR) {
+            printf("File already exists: %s\n", c_mnt_path);
             return -1;
         }
+
+        int returnVal = umount2(c_mnt_path, MNT_FORCE);
+        if (returnVal) {
+            printf("umount() failed. (%d)\n", returnVal);
+        }
+
+        returnVal = mount(devicePath, c_mnt_path, "vfat", MS_SYNCHRONOUS, NULL);  // should we use synchronous IO?
+        if (returnVal) {
+            printf("mount() failed. (%d)\n", returnVal);
+            return -1;
+        }
+
+        hCMDf = ::open(c_cmd_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
+        hDATf = ::open(c_dat_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
+
     } else {
         cerr << "TODO" << endl;
+        close();
         exit(-1);
         // string COM = findUsbSerialCom();
         // while (COM == "NONE") {
@@ -403,5 +463,6 @@ int EDBInterface::open(bool mode) {
         // }
         // com.Set();
     }
+
     return 0;
 }

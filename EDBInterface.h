@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <libudev.h>
 #include <libusb-1.0/libusb.h>
+#include <stdio.h>
 #define INFO(fmt, ...) printf(fmt, __VA_ARGS__)
 
 #define EOS_VID 0xCAFE
@@ -16,7 +17,7 @@
 #define EDB_MODE_BIN true
 #define EDB_MODE_TEXT false
 
-#define BIN_BLOCK_SIZE 32768
+#define BIN_BLOB_SIZE 32768
 
 // Availble on Windows but not on Unix {
 #define DWORD unsigned int
@@ -46,10 +47,11 @@ private:
     libusb_device_handle *usbdev = NULL; /* the device handle */
     bool USBHighSpeed = false;
     // CComHelper com;
-    char sendBuf[BIN_BLOCK_SIZE];
-    libusb_device_handle *hCMDf = NULL;
-    libusb_device_handle *hDATf = NULL;
-    char wrBuf[512];
+    char *sendBuf = nullptr;
+    int hCMDf;
+    int hDATf;
+    const int wrBufSize = 512;
+    char *wrBuf = nullptr;
 
 public:
     void reset(bool mode);
