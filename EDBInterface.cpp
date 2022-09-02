@@ -315,17 +315,21 @@ int EDBInterface::open() {
     // ----------------MOUNT 39GII DISK----------------
 
     struct stat st = {0};
-        
+    int returnVal;
+
     if (stat(c_mnt_path, &st) == -1) {
         mkdir(c_mnt_path, 0700);
-    } else if ((st.st_mode & S_IFMT) != S_IFDIR) {
-        printf("File already exists: %s\n", c_mnt_path);
-        return -1;
-    }
+    } else {
+        if ((st.st_mode & S_IFMT) != S_IFDIR) {
+            printf("A file already exists: %s\n", c_mnt_path);
+            return -1;
+        }
 
-    int returnVal = umount2(c_mnt_path, MNT_FORCE);
-    if (returnVal) {
-        printf("umount() failed with code %d\n", returnVal);
+        returnVal = umount2(c_mnt_path, MNT_FORCE);
+        if (returnVal) {
+            printf("umount2() failed with code %d\n", returnVal);
+            // maybe it isn't mounted
+        }
     }
 
     returnVal = mount(devicePath, c_mnt_path, "vfat", MS_SYNCHRONOUS, NULL);  // should we use synchronous IO?
