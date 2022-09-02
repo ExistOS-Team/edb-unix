@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <unistd.h>
+#include <signal.h>
 #include "EDBInterface.h"
 
 using namespace std;
@@ -18,7 +19,17 @@ void showUsage() {
     cout << "\t-m Enter Mass Storage mode. (Is this working at all?)" << endl;
 }
 
+void handleInterrupt(int id) {
+    printf("\nInterrupted\n");
+    edb.close();
+    exit(-1);
+}
+
 int main(int argc, char *argv[]) {
+    struct sigaction sigHandler;
+    sigHandler.sa_handler = handleInterrupt;
+    sigaction(SIGINT, &sigHandler, NULL);
+
     bool reboot = false;
     bool mscmode = false;
 
@@ -50,7 +61,7 @@ int main(int argc, char *argv[]) {
             item.toPage = atoi(argv[i + 2]);
             if (i + 3 < argc) {
                 if (strcmp(argv[i + 3], "b") == 0) {
-                    printf("Set boot img.\n");
+                    printf("Set as boot img.\n");
                     item.bootImg = true;
                 }
             }
