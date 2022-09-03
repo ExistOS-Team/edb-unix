@@ -1,6 +1,6 @@
 # ExistOS Dump Bridge for Linux
 
-*Forked from [yuuki410/ExistOS-Dump-Brige](https://github.com/yuuki410/ExistOS-Dump-Brige)*
+_Forked from [yuuki410/ExistOS-Dump-Brige](https://github.com/yuuki410/ExistOS-Dump-Brige)_
 
 A Linux port of [edb](https://github.com/ExistOS-Team/edb).
 
@@ -14,7 +14,9 @@ Flashing ExistOS firmware to HP39gII.
 ## Compiling
 
 ```
-g++ main.cpp EDBInterface.cpp -o edb
+mkdir build
+cmake -B build
+cmake --build build
 ```
 
 ## Known issues
