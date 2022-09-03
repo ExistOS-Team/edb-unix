@@ -1,9 +1,9 @@
+#include "EDBInterface.h"
 #include <cstring>
 #include <iostream>
-#include <vector>
-#include <unistd.h>
 #include <signal.h>
-#include "EDBInterface.h"
+#include <unistd.h>
+#include <vector>
 
 using namespace std;
 
@@ -16,7 +16,7 @@ void showUsage() {
     cout << "Usage:" << endl;
     cout << "\t-f <bin file> <page> [b] (Specify 'b' to flash as boot image.)" << endl;
     cout << "\t-r Reboot if all operations are done." << endl;
-    cout << "\t-m Enter Mass Storage mode. (Is this working at all?)" << endl;
+    cout << "\t-m Enter Mass Storage mode." << endl;
 }
 
 void handleInterrupt(int id) {
