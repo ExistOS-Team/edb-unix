@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <malloc.h>
+#include <fcntl.h>
 
 using namespace std;
 
