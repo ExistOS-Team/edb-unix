@@ -263,9 +263,9 @@ int EDBInterface::open() {
     sendBuf = (char*) memalign(512, BIN_BLOB_SIZE);
 
     FILE *lsblkFile;
-    char *c_mnt_path = "/mnt/edbMount";
-    char *c_cmd_path = "/mnt/edbMount/cmd_port";
-    char *c_dat_path = "/mnt/edbMount/dat_port";
+    char *c_mnt_path = "/tmp/edbMount";
+    char *c_cmd_path = "/tmp/edbMount/cmd_port";
+    char *c_dat_path = "/tmp/edbMount/dat_port";
 
     char line[128] = "\0";
     char *devicePath = nullptr;
