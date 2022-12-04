@@ -1,15 +1,15 @@
 #include "EDBInterface.h"
 
-#include <cstring>
-#include <iostream>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <fcntl.h>
+#include <iostream>
+#include <malloc.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <sys/mount.h>
-#include <malloc.h>
-#include <fcntl.h>
 
 using namespace std;
 
@@ -29,6 +29,28 @@ unsigned char blockChksum(char *block, unsigned int blockSize) {
     return sum;
 }
 
+char *EDBInterface::createCmdPath() {
+    size_t len = strlen(mntPath);
+    char *s = (char *)malloc(len + 10);
+    strcpy(s, mntPath);
+    if (len != 0 || mntPath[len - 1] != '/') {
+        strcat(s, "/");
+    }
+    strcat(s, "cmd_port");
+    return s;
+}
+
+char *EDBInterface::createDatPath() {
+    size_t len = strlen(mntPath);
+    char *s = (char *)malloc(len + 10);
+    strcpy(s, mntPath);
+    if (len != 0 || mntPath[len - 1] != '/') {
+        strcat(s, "/");
+    }
+    strcat(s, "dat_port");
+    return s;
+}
+
 bool EDBInterface::waitStr(char *str) {
     int retry = 2;
     int ret;
@@ -36,7 +58,7 @@ bool EDBInterface::waitStr(char *str) {
         cout << "Waiting Sync...\r";
         memset(wrBuf, 0, wrBufSize);
         lseek(hCMDf, 0, SEEK_SET);
-        ret = read(hCMDf, wrBuf, wrBufSize);  // ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
+        ret = read(hCMDf, wrBuf, wrBufSize); // ReadFile(hCMDf, wrBuf, sizeof(wrBuf), &cnt, NULL);
         if (ret) {
             if (strcmp(str, wrBuf) == 0) {
                 return true;
@@ -49,26 +71,24 @@ bool EDBInterface::waitStr(char *str) {
             retry--;
         }
     }
-    
+
     return false;
 }
 
-void EDBInterface::wrStr(const char *str) {
+bool EDBInterface::wrStr(const char *str) {
     if (!str) {
-        return;
+        return false;
     }
     memset(wrBuf, 0, wrBufSize);
     strcpy(wrBuf, str);
     lseek(hCMDf, 0, SEEK_SET);
-    write(hCMDf, wrBuf, wrBufSize);
+    return (bool)write(hCMDf, wrBuf, wrBufSize);
 }
 
 bool EDBInterface::wrDat(char *dat, size_t len) {
     int ret = 0;
     lseek(hDATf, 0, SEEK_SET);
-    ret = write(hDATf, dat, len);
-
-    return ret ? true : false;
+    return (bool)write(hDATf, dat, len);
 }
 
 bool EDBInterface::rdDat(char *dat, size_t len, size_t *rbcnt) {
@@ -78,7 +98,7 @@ bool EDBInterface::rdDat(char *dat, size_t len, size_t *rbcnt) {
     memcpy(dat, wrBuf, len);
     *rbcnt = len;
 
-    return ret ? true : false;
+    return (bool)ret;
 }
 
 bool EDBInterface::eraseBlock(unsigned int block) {
@@ -176,7 +196,7 @@ int EDBInterface::flash(flashImg item) {
     if (item.bootImg) {
         cout << "\nSetting NCB..." << endl;
         memset(cmdbuf, 0, sizeof(cmdbuf));
-        sprintf(cmdbuf, "MKNCB:%d,%d\n", item.toPage / 64, fsize / 2048);
+        sprintf(cmdbuf, "MKNCB: %d, %ld\n", item.toPage / 64, fsize / 2048);
         this->wrStr(cmdbuf);
         if (this->waitStr((char *)"MKOK\n") == false) {
             printf("Setting NCB page timed out: %d\n", item.toPage / 64);
@@ -238,14 +258,12 @@ void EDBInterface::close() {
     ::close(hCMDf);
     ::close(hDATf);
 
-    char *c_mnt_path = "/mnt/edbMount";
-
-    int returnVal = umount(c_mnt_path);
+    int returnVal = umount(mntPath);
     if (returnVal) {
         printf("umount() failed with code %d\n", returnVal);
     }
 
-    returnVal = rmdir(c_mnt_path);
+    returnVal = rmdir(mntPath);
     if (returnVal) {
         printf("rmdir() failed with code %d\n", returnVal);
     }
@@ -259,13 +277,10 @@ void EDBInterface::close() {
 int EDBInterface::open() {
     free(wrBuf);
     free(sendBuf);
-    wrBuf = (char*) memalign(512, wrBufSize);
-    sendBuf = (char*) memalign(512, BIN_BLOB_SIZE);
+    wrBuf = (char *)memalign(512, wrBufSize);
+    sendBuf = (char *)memalign(512, BIN_BLOB_SIZE);
 
     FILE *lsblkFile;
-    char *c_mnt_path = "/tmp/edbMount";
-    char *c_cmd_path = "/tmp/edbMount/cmd_port";
-    char *c_dat_path = "/tmp/edbMount/dat_port";
 
     char line[128] = "\0";
     char *devicePath = nullptr;
@@ -279,36 +294,37 @@ int EDBInterface::open() {
         lsblkFile = popen("lsblk -d -P -p -o HOTPLUG,VENDOR,LABEL,KNAME", "r");
         if (lsblkFile) {
 
-            while (fgets(line, sizeof(line), lsblkFile)) {  // iterate through every line
+            while (fgets(line, sizeof(line), lsblkFile)) { // iterate through every line
                 // check if this line is what we are looking for
-                if (strstr(line, "HOTPLUG=\"1\"") != nullptr &&  // Is a USB device?
-                    strstr(line, "ExistOS")       != nullptr /*&&*/  // Vendor should contain "ExistOS"
-                    /*strstr(line, "EOSRECDISK")    != nullptr*/) {  // Label should contain "EOSRECDISK"
+                if (strstr(line, "HOTPLUG=\"1\"") != nullptr &&     // Is a USB device?
+                    strstr(line, "ExistOS") != nullptr /*&&*/       // Vendor should contain "ExistOS"
+                    /*strstr(line, "EOSRECDISK")    != nullptr*/) { // Label should contain "EOSRECDISK"
 
-                    char *position = strstr(line, "KNAME=\"");  // locate where 'KNAME="' starts
+                    char *position = strstr(line, "KNAME=\""); // locate where 'KNAME="' starts
                     if (position) {
-                        position += 7; // jump over 'KNAME="'
-                        char *endPosition = strchr(position, '"');  // locate the end of KNAME key-value pair
+                        position += 7;                             // jump over 'KNAME="'
+                        char *endPosition = strchr(position, '"'); // locate the end of KNAME key-value pair
 
-                        if (endPosition != nullptr && position != endPosition) {  // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
-                            *endPosition = '\0';  // Success!
+                        if (endPosition != nullptr && position != endPosition) { // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
+                            *endPosition = '\0';                                 // Success!
                             devicePath = position;
-                            break;  // retreat!
+                            break; // retreat!
                         }
                     }
                 }
-                line[0] = '\0';  // in case fgets goes nuts (Is this really necessary?)
+                line[0] = '\0'; // in case fgets goes nuts (Is this really necessary?)
             }
 
             fclose(lsblkFile);
         }
 
-        if (devicePath) break;  // devicePath not being null indicates a success
+        if (devicePath)
+            break; // devicePath not being null indicates a success
         if (retry == 4) {
             cout << "timed out." << endl;
             return -1;
         }
-        cout << ". " << flush;  // each dot indicates a failed attempt
+        cout << ". " << flush; // each dot indicates a failed attempt
         sleep(2);
     }
     cout << "connected." << endl;
@@ -318,29 +334,36 @@ int EDBInterface::open() {
     struct stat st = {0};
     int returnVal;
 
-    if (stat(c_mnt_path, &st) == -1) {
-        mkdir(c_mnt_path, 0700);
+    if (stat(mntPath, &st) == -1) {
+        mkdir(mntPath, 0700);
     } else {
         if ((st.st_mode & S_IFMT) != S_IFDIR) {
-            printf("A file already exists: %s\n", c_mnt_path);
+            printf("A file already exists: %s\n", mntPath);
             return -1;
         }
 
-        returnVal = umount2(c_mnt_path, MNT_FORCE);
+        returnVal = umount2(mntPath, MNT_FORCE);
         if (returnVal) {
             printf("umount2() failed with code %d\n", returnVal);
             // maybe it isn't mounted
         }
     }
 
-    returnVal = mount(devicePath, c_mnt_path, "vfat", MS_SYNCHRONOUS, NULL);  // should we use synchronous IO?
+    returnVal = mount(devicePath, mntPath, "vfat", MS_SYNCHRONOUS, NULL); // should we use synchronous IO?
     if (returnVal) {
         printf("mount() failed with code %d\n", returnVal);
         return -1;
     }
 
+    char *c_cmd_path = createCmdPath();
+    char *c_dat_path = createDatPath();
+
     hCMDf = ::open(c_cmd_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
     hDATf = ::open(c_dat_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
 
+    free(c_cmd_path);
+    free(c_dat_path);
+
+    // printf("%s %s %s", getMntPath(), getCmdPath(), getDatPath());
     return 0;
 }

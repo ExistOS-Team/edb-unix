@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdio>
 #include <cstdint>
+#include <string>
 
 #define BIN_BLOB_SIZE 32768
 
@@ -18,10 +19,13 @@ private:
     const int wrBufSize = 512;
     char *wrBuf = nullptr;
     char *sendBuf = nullptr;
+    char* createCmdPath();
+    char* createDatPath();
 
 public:
+    char* mntPath = (char*) "/tmp/edbMount";
     bool waitStr(char *str);
-    void wrStr(const char *str);
+    bool wrStr(const char *str);
     bool wrDat(char *dat, size_t len);
     bool rdDat(char *dat, size_t len, size_t *rbcnt);
     bool eraseBlock(unsigned int block);

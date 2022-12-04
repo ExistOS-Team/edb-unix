@@ -15,6 +15,7 @@ void showUsage() {
     cout << "Note: Serial mode is deprecated by the King and will NOT be implemented." << endl;
     cout << "Usage:" << endl;
     cout << "\t-f <bin file> <page> [b] (Specify 'b' to flash as boot image.)" << endl;
+    cout << "\t-t <path> Specify temporary mount location." << endl;
     cout << "\t-r Reboot if all operations are done." << endl;
     cout << "\t-m Enter Mass Storage mode." << endl;
 }
@@ -63,10 +64,21 @@ int main(int argc, char *argv[]) {
                 if (strcmp(argv[i + 3], "b") == 0) {
                     printf("Set as boot img.\n");
                     item.bootImg = true;
+                    i++;
                 }
             }
             printf("Flash to page: %d\n", item.toPage);
             imglist.push_back(item);
+            i += 2;
+        }
+
+        if (strcmp(argv[i], "-t") == 0) {
+            if (i + 1 > argc) {
+                showUsage();
+                return -1;
+            }
+            edb.mntPath = argv[i + 1];
+            i += 1;
         }
 
         if (strcmp(argv[i], "-r") == 0) {
@@ -82,6 +94,8 @@ int main(int argc, char *argv[]) {
         edb.close();
         return -1;
     }
+
+    cout << "Opened" << endl;
 
     if (edb.ping() == false) {
         cout << "Device not responding." << endl;
