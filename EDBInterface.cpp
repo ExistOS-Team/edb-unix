@@ -284,6 +284,9 @@ int EDBInterface::open() {
     sendBuf = (char *)memalign(512, BIN_BLOB_SIZE);
 
     FILE *lsblkFile;
+    char *c_mnt_path = nullptr;
+    char *c_cmd_path = nullptr;
+    char *c_dat_path = nullptr;
 
     char line[128] = "\0";
 
@@ -389,8 +392,9 @@ int EDBInterface::open() {
         return -1;
     }
 
-    char *c_cmd_path = createCmdPath();
-    char *c_dat_path = createDatPath();
+    this->c_mnt_path=c_mnt_path;
+    c_cmd_path=createCmdPath();
+    c_dat_path=createDatPath();
 
     hCMDf = ::open(c_cmd_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
     hDATf = ::open(c_dat_path, O_RDWR | O_CREAT | O_DIRECT | O_SYNC, 0666);
