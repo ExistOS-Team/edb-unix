@@ -19,6 +19,7 @@ private:
     const int wrBufSize = 512;
     char *wrBuf = nullptr;
     char *sendBuf = nullptr;
+    char *devicePath = nullptr;
     char* createCmdPath();
     char* createDatPath();
 

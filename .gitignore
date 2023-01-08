@@ -37,5 +37,20 @@ build/
 # VS Code
 .vscode/
 
+edb
+
+# ExistOS
+*.sys
+*.sb
+
+# Nix outputs
+result
+
+edb
+
+# ExistOS
+*.sys
+*.sb
+
 # Nix outputs
 result
