@@ -10,6 +10,10 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mount.h>
+#include <malloc.h>
+#include <fcntl.h>
 
 using namespace std;
 

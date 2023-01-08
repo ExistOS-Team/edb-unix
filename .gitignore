@@ -37,6 +37,9 @@ build/
 # VS Code
 .vscode/
 
+# Nix outputs
+result
+
 edb
 
 # ExistOS
