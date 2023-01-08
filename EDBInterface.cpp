@@ -10,10 +10,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <sys/mount.h>
-#include <malloc.h>
-#include <fcntl.h>
 
 using namespace std;
 
@@ -313,7 +309,9 @@ int EDBInterface::open() {
 
                         if (endPosition != nullptr && position != endPosition) { // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
                             *endPosition = '\0';                                 // Success!
-                            devicePath = position;
+                            // devicePath = position;
+                            devicePath = (char*)malloc( sizeof(char) * (strlen(position)+1) );
+                            strcpy(devicePath, position);
                             break; // retreat!
                         }
                     }
@@ -373,7 +371,9 @@ int EDBInterface::open() {
 
                     if (endPosition != nullptr && position != endPosition) {  // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
                         *endPosition = '\0';  // Success!
-                        c_mnt_path = position;
+                        // c_mnt_path = position;
+                        c_mnt_path = (char*)malloc( sizeof(char) * (strlen(position)+1) );
+                        strcpy(c_mnt_path, position);
                         break;  // retreat!
                     }
                 }

@@ -19,9 +19,9 @@ private:
     const int wrBufSize = 512;
     char *wrBuf = nullptr;
     char *sendBuf = nullptr;
+    char *devicePath = nullptr;
     char* createCmdPath();
     char* createDatPath();
-    char *devicePath = nullptr;
 
 public:
     char* c_mnt_path = (char*) "/tmp/edbMount";
