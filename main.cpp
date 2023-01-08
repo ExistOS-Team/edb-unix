@@ -39,10 +39,10 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (geteuid() != 0) {
-        cout << "Please run with root privileges!" << endl;
-        return -1;
-    }
+    // if (geteuid() != 0) {
+    //     cout << "Please run with root privileges!" << endl;
+    //     return -1;
+    // }
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-f") == 0) {

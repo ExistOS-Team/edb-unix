@@ -258,15 +258,18 @@ void EDBInterface::close() {
     ::close(hCMDf);
     ::close(hDATf);
 
-    int returnVal = umount(c_mnt_path);
-    if (returnVal) {
-        printf("umount() failed with code %d\n", returnVal);
+    cout << "Unmounting USB device" << endl;
+    char udisksctl_command[128] = "udisksctl unmount -b ";
+    cout << "Parsing udisksctl command: " << flush;
+    strcat(udisksctl_command, devicePath);
+    cout << udisksctl_command << endl;
+    FILE *udisksctl_result;
+    udisksctl_result = popen(udisksctl_command, "r");
+    char line[128] = "\0";
+    while(fgets(line, sizeof(line), udisksctl_result)){
+        cout<< line << endl;
     }
-
-    returnVal = rmdir(c_mnt_path);
-    if (returnVal) {
-        printf("rmdir() failed with code %d\n", returnVal);
-    }
+    fclose(udisksctl_result);
 
     free(wrBuf);
     free(sendBuf);
@@ -283,7 +286,6 @@ int EDBInterface::open() {
     FILE *lsblkFile;
 
     char line[128] = "\0";
-    char *devicePath = nullptr;
 
     cout << "Waiting for USB CDC connection: " << flush;
 
@@ -318,40 +320,68 @@ int EDBInterface::open() {
             fclose(lsblkFile);
         }
 
-        if (devicePath)
-            break; // devicePath not being null indicates a success
+        if (devicePath) {
+            cout << endl << '\t' << line << '"' << endl;
+            break;  // devicePath not being null indicates a success
+        }
         if (retry == 4) {
-            cout << "timed out." << endl;
+            cerr << "timed out." << endl;
             return -1;
         }
         cout << ". " << flush; // each dot indicates a failed attempt
         sleep(2);
     }
-    cout << "connected." << endl;
+    cout << "connected: " << devicePath << endl;
 
     // ----------------MOUNT 39GII DISK----------------
 
     struct stat st = {0};
     int returnVal;
 
-    if (stat(c_mnt_path, &st) == -1) {
-        mkdir(c_mnt_path, 0700);
-    } else {
-        if ((st.st_mode & S_IFMT) != S_IFDIR) {
-            printf("A file already exists: %s\n", c_mnt_path);
-            return -1;
-        }
-
-        returnVal = umount2(c_mnt_path, MNT_FORCE);
-        if (returnVal) {
-            printf("umount2() failed with code %d\n", returnVal);
-            // maybe it isn't mounted
-        }
+    cout << "Mounting USB device..." << endl;
+    char udisksctl_command[128] = "udisksctl mount -b ";
+    cout << "Parsing udisksctl command: " << flush;
+    
+    strcat(udisksctl_command, devicePath);
+    cout << udisksctl_command << endl;
+    FILE *udisksctl_result;
+    udisksctl_result = popen(udisksctl_command, "r");
+    while(fgets(line, sizeof(line), udisksctl_result)){
+        cout<< line << endl;
     }
+    fclose(udisksctl_result);
 
-    returnVal = mount(devicePath, c_mnt_path, "vfat", MS_SYNCHRONOUS, NULL); // should we use synchronous IO?
-    if (returnVal) {
-        printf("mount() failed with code %d\n", returnVal);
+    cout << "Scaning mount points..." << endl;
+
+    lsblkFile = popen("lsblk -d -P -p -o HOTPLUG,VENDOR,LABEL,MOUNTPOINTS", "r");
+    if (lsblkFile) {
+
+        while (fgets(line, sizeof(line), lsblkFile)) {  // iterate through every line
+            // check if this line is what we are looking for
+            if (strstr(line, "HOTPLUG=\"1\"") != nullptr &&  // Is a USB device?
+                strstr(line, "ExistOS")       != nullptr /*&&*/  // Vendor should contain "ExistOS"
+                /*strstr(line, "EOSRECDISK")    != nullptr*/) {  // Label should contain "EOSRECDISK"
+
+                char *position = strstr(line, "MOUNTPOINTS=\"");  // locate where 'KNAME="' starts
+                if (position) {
+                    position += 13; // jump over 'KNAME="'
+                    char *endPosition = strchr(position, '"');  // locate the end of KNAME key-value pair
+
+                    if (endPosition != nullptr && position != endPosition) {  // Deal with 'KNAME="' (this line is too long) or 'KNAME=""' (empty value)
+                        *endPosition = '\0';  // Success!
+                        c_mnt_path = position;
+                        break;  // retreat!
+                    }
+                }
+            }
+            line[0] = '\0';  // in case fgets goes nuts (Is this really necessary?)
+        }
+
+        fclose(lsblkFile);
+    }
+    
+    if(!c_mnt_path) {
+        cerr << "Mounting failed." << endl;
         return -1;
     }
 

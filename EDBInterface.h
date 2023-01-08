@@ -21,6 +21,7 @@ private:
     char *sendBuf = nullptr;
     char* createCmdPath();
     char* createDatPath();
+    char *devicePath = nullptr;
 
 public:
     char* c_mnt_path = (char*) "/tmp/edbMount";

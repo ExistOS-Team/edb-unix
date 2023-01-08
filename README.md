@@ -19,6 +19,12 @@ cmake -B build
 cmake --build build
 ```
 
+## Flashing Firmware
+
+```
+edb -r -s -f OSLoader.sb 1408 b -f ExistOS.sys 1984
+```
+
 ## Known issues
 
 If you use `sbtool` in conjunction with `edb`, for example loading OSLoader into calculator's RAM, there's a chance that the ExistOS disk cannot be mounted properly.
